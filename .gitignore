@@ -48,5 +48,5 @@ data/*.json
 data/*.csv
 
 # Plotly and visualization
-*.html
+
 *.png

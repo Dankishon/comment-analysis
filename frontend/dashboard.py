@@ -1,41 +1,29 @@
 import dash
-from dash import html, dcc
-import requests
+from dash import dcc, html
 import pandas as pd
-import plotly.express as px
+import requests
 
-# Получение данных с бэкенда
-response = requests.get("http://127.0.0.1:5000/api/data")
-data = response.json()
-
-# Преобразование данных в DataFrame
-df = pd.DataFrame(data)
-
-# Создание графиков
-likes_bar = px.bar(
-    df, 
-    x="id", 
-    y="likes_count", 
-    title="Количество лайков по постам",
-    labels={"likes_count": "Лайки", "id": "ID поста"}
-)
-
-comments_bar = px.bar(
-    df, 
-    x="id", 
-    y="comments_count", 
-    title="Количество комментариев по постам",
-    labels={"comments_count": "Комментарии", "id": "ID поста"}
-)
-
-# Инициализация Dash-приложения
 app = dash.Dash(__name__)
 
+# Пример данных (замените на загрузку из Flask API)
+data = requests.get('http://127.0.0.1:5000/api/data').json()
+df = pd.DataFrame(data)
+
 app.layout = html.Div([
-    html.H1("Аналитика постов из JSON"),
-    dcc.Graph(figure=likes_bar),
-    dcc.Graph(figure=comments_bar)
+    html.H1("Text Analysis Dashboard"),
+    dcc.Graph(
+        id='example-graph',
+        figure={
+            'data': [
+                {'x': df['id'], 'y': df['likes_count'], 'type': 'bar', 'name': 'Likes'},
+                {'x': df['id'], 'y': df['comments_count'], 'type': 'bar', 'name': 'Comments'},
+            ],
+            'layout': {
+                'title': 'Likes and Comments per Post'
+            }
+        }
+    )
 ])
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run_server(debug=True)
