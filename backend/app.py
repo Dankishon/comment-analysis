@@ -21,5 +21,14 @@ def get_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/classify", methods=["GET"])
+def classify_data():
+    texts = load_json(DATA_FILE)
+    classified_data = classify_texts([entry['text'] for entry in texts])
+    return jsonify(classified_data)
+
+
+
 if __name__ == "__main__":
     app.run(debug=True)
+
