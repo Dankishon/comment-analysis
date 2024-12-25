@@ -54,7 +54,7 @@ def analyze_sentiment(text):
     """
     predictions = sentiment_model([text])
     print("Predictions:", predictions)  # Отладочный вывод
-    sentiment_label = predictions[0][0]  # Метка тональности (positive, negative, neutral)
+    sentiment_label = predictions[0][0]  # Метка тональности (p, n, neu)
     
     # Проверка и обработка вероятности
     sentiment_confidence = predictions[1][0] if len(predictions) > 1 else None
@@ -65,12 +65,15 @@ def analyze_sentiments(data):
     """
     Добавляет метку тональности и уверенность модели к каждому элементу данных.
     """
+    sentiment_mapping = {"p": "positive", "n": "negative", "neu": "neutral"}
     processed_data = []
     for entry in data:
         text = entry.get("text", "")
         if text:
             # Анализ тональности
             sentiment_label, sentiment_score = analyze_sentiment(text)
+            # Преобразование метки в формат, ожидаемый дашбордом
+            sentiment_label = sentiment_mapping.get(sentiment_label, "neutral")
             entry["sentiment_label"] = sentiment_label
             entry["sentiment_score"] = sentiment_score
         processed_data.append(entry)

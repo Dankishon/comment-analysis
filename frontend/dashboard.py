@@ -27,7 +27,15 @@ app.layout = html.Div([
     html.Button("Analyze Test Data", id="analyze-button", n_clicks=0),
 
     # Вывод графиков и таблиц
-    html.Div(id="dashboard-content")
+    html.Div(id="dashboard-content"),
+
+    # Вкладки для отображения списков комментариев
+    dcc.Tabs(id="tabs", value="positive", children=[
+        dcc.Tab(label="Positive Comments", value="positive"),
+        dcc.Tab(label="Neutral Comments", value="neutral"),
+        dcc.Tab(label="Negative Comments", value="negative")
+    ]),
+    html.Div(id="comments-content")
 ])
 
 # Функция для обновления дашборда
@@ -43,6 +51,7 @@ def update_dashboard(n_clicks):
             processed_data = analyze_sentiments(data["items"])
 
             # Преобразование данных в DataFrame
+            global df
             df = pd.DataFrame(processed_data)
 
             # Проверка наличия необходимых колонок
@@ -51,38 +60,60 @@ def update_dashboard(n_clicks):
                 if column not in df.columns:
                     raise ValueError(f"Missing required column: {column}")
 
-            # Фильтрация данных по тональностям
-            positive_texts = df[df["sentiment_label"] == "positive"]
-            neutral_texts = df[df["sentiment_label"] == "neutral"]
-            negative_texts = df[df["sentiment_label"] == "negative"]
+            print("Dataframe after analysis:")
+            print(df.head())  # Выводим содержимое для отладки
+            print("Unique sentiment labels:", df["sentiment_label"].unique())
 
             # Построение графика распределения тональностей
             sentiment_counts = df["sentiment_label"].value_counts().reset_index()
             sentiment_counts.columns = ["Sentiment", "Count"]
             fig = px.bar(sentiment_counts, x="Sentiment", y="Count", title="Sentiment Distribution")
 
-            # Возвращение содержимого дашборда
             return html.Div([
-                dcc.Graph(figure=fig),
-
-                html.H3("Positive Comments"),
-                html.Ul([html.Li(comment) for comment in positive_texts["text"].head(10)]),
-
-                html.H3("Neutral Comments"),
-                html.Ul([html.Li(comment) for comment in neutral_texts["text"].head(10)]),
-
-                html.H3("Negative Comments"),
-                html.Ul([html.Li(comment) for comment in negative_texts["text"].head(10)])
+                dcc.Graph(figure=fig)
             ])
         except Exception as e:
             return html.Div([
                 html.H3("An error occurred"),
                 html.P(str(e))
             ])
-
     return html.Div([
         html.P("Click the button to analyze the test data.")
     ])
+
+# Функция для отображения комментариев
+@app.callback(
+    Output("comments-content", "children"),
+    Input("tabs", "value")
+)
+def display_comments(tab_value):
+    if "df" not in globals():
+        return html.Div([
+            html.P("Please analyze the data first by clicking the 'Analyze Test Data' button.")
+        ])
+    try:
+        # Фильтрация данных по выбранной тональности
+        filtered_df = df[df["sentiment_label"] == tab_value]
+        comments_list = filtered_df["text"].tolist()
+
+        print(f"Selected tab: {tab_value}")
+        print(f"Filtered Data: {filtered_df}")
+
+        # Генерация списка комментариев
+        if not comments_list:
+            return html.Div([
+                html.H3(f"No comments found for {tab_value.capitalize()} sentiment")
+            ])
+
+        return html.Div([
+            html.H3(f"{tab_value.capitalize()} Comments"),
+            html.Ul([html.Li(comment) for comment in comments_list])
+        ])
+    except Exception as e:
+        return html.Div([
+            html.H3("An error occurred while displaying comments"),
+            html.P(str(e))
+        ])
 
 # Запуск приложения
 if __name__ == "__main__":
