@@ -1,8 +1,13 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_from_directory
 from process_data import load_json, analyze_sentiments, classify_texts
+import os
 
-app = Flask(__name__, template_folder="../frontend/templates")
-
+# Создание Flask-приложения
+app = Flask(
+    __name__,
+    template_folder="../frontend/templates",
+    static_folder="../frontend/static"
+)
 
 @app.route('/')
 def home():
@@ -18,7 +23,7 @@ def get_data():
     API для предоставления обработанных данных.
     """
     try:
-        data = load_json("data/comments.json")
+        data = load_json("data/test_vk_post_results.json")
         processed_data = analyze_sentiments(data)
         return jsonify(processed_data)
     except Exception as e:
@@ -60,5 +65,17 @@ def analyze_texts():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/static/<path:path>')
+def serve_static(path):
+    """
+    Обслуживает статические файлы (CSS, JS).
+    """
+    return send_from_directory(os.path.join(app.root_path, '../frontend/static'), path)
+
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
+    print(f"Serving static files from: {os.path.abspath('../frontend/static')}")
+    print(f"Serving templates from: {os.path.abspath('../frontend/templates')}")
+    print(f"Serving data files from: {os.path.abspath('../data')}")
