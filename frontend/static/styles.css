@@ -1,0 +1,106 @@
+/* Общий стиль для всего дашборда */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+h1 {
+    color: #4CAF50;
+    text-align: center;
+    margin-top: 20px;
+    font-size: 2.5em;
+}
+
+h3 {
+    color: #555;
+    margin-top: 20px;
+    text-align: center;
+}
+
+p {
+    text-align: center;
+    color: #666;
+    margin: 10px 0;
+}
+
+/* Кнопка анализа данных */
+button {
+    display: block;
+    margin: 20px auto;
+    padding: 10px 20px;
+    font-size: 1em;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+/* Графики */
+.dash-graph {
+    margin: 20px auto;
+    max-width: 800px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background-color: white;
+    padding: 20px;
+}
+
+/* Вкладки */
+.dash-tabs {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.dash-tabs .tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    background-color: white;
+    border-radius: 5px;
+    margin: 0 5px;
+    transition: background-color 0.3s ease;
+}
+
+.dash-tabs .tab:hover {
+    background-color: #f4f4f4;
+}
+
+.dash-tabs .tab-active {
+    background-color: #4CAF50;
+    color: white;
+    border-color: #4CAF50;
+}
+
+/* Списки комментариев */
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+ul li {
+    background-color: white;
+    margin: 10px auto;
+    max-width: 800px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Сообщения об ошибках */
+.error-message {
+    color: red;
+    text-align: center;
+    font-weight: bold;
+    margin-top: 20px;
+}
