@@ -1,5 +1,12 @@
 from flask import Flask, jsonify, request, render_template, send_from_directory
-from process_data import load_json, analyze_sentiments, classify_texts, train_model, save_model
+from process_data import (
+    load_json,
+    analyze_sentiments,
+    classify_texts,
+    train_model,
+    save_model,
+    load_model  # 👈 добавлен импорт функции загрузки модели
+)
 import os
 
 # Создание Flask-приложения
@@ -12,18 +19,18 @@ app = Flask(
 MODEL_PATH = "data/model.pkl"
 VECTORIZER_PATH = "data/vectorizer.pkl"
 
-# Глобальные переменные для модели и векторизатора
+# Глобальные переменные модели и векторизатора
 model = None
 vectorizer = None
 
-# ✅ Загружаем модель при старте
+# ✅ Загружаем модель при запуске сервера
 def load_model_on_startup():
     global model, vectorizer
     if os.path.exists(MODEL_PATH) and os.path.exists(VECTORIZER_PATH):
         print("🔁 Загружаем существующую модель и векторизатор...")
-        model, vectorizer = train_model(training_file=None, model_path=MODEL_PATH, vectorizer_path=VECTORIZER_PATH)
+        model, vectorizer = load_model(MODEL_PATH, VECTORIZER_PATH)
     else:
-        print("⚠️ Модель не найдена. Обучите модель через API /api/train")
+        print("⚠️ Модель не найдена. Обучите модель через интерфейс загрузки.")
 
 load_model_on_startup()
 
@@ -48,6 +55,8 @@ def classify():
         texts = request_data.get("texts", [])
         if not texts:
             return jsonify({"error": "No texts provided"}), 400
+        if model is None or vectorizer is None:
+            return jsonify({"error": "Model not loaded"}), 500
 
         classifications = classify_texts(texts, model, vectorizer)
         return jsonify(classifications)

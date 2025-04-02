@@ -5,57 +5,52 @@ from dash import dcc, html, Input, Output, State
 import plotly.express as px
 import pandas as pd
 import requests
-import datetime
 
-# Добавляем путь к backend в sys.path
+# Добавляем путь к backend
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../backend')))
+from process_data import analyze_sentiments, load_json, generate_wordcloud
 
-from process_data import analyze_sentiments, load_json
-
-# Создание Dash-приложения
+# Инициализация Dash-приложения
 app = dash.Dash(
     __name__,
-    external_stylesheets=[
-        "/frontend/static/styles.css"
-    ]
+    external_stylesheets=["/frontend/static/styles.css"]
 )
 app.title = "Text Analysis Dashboard"
 
-# Путь к тестовому файлу
+# Пути и API
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 TEST_FILE_PATH = os.path.join(BASE_DIR, 'data', 'test_vk_post.json')
-
-# URL для обучения модели
 TRAIN_API_URL = "http://127.0.0.1:5000/api/train"
 
-# Макет приложения
+# Макет интерфейса
 app.layout = html.Div([
     html.H1("Text Analysis Dashboard", style={"textAlign": "center", "color": "#3a3a3a"}),
     html.P("Analyze social media texts with sentiment analysis.", style={"textAlign": "center", "color": "#7f8c8d"}),
 
-    # Компонент для загрузки пользовательских данных
+    # Загрузка данных и обучение
     html.Div([
         dcc.Upload(
             id="upload-data",
             children=html.Div(["Drag and Drop or ", html.A("Select File")]),
             style={
-                "width": "100%",
-                "height": "60px",
-                "lineHeight": "60px",
-                "borderWidth": "1px",
-                "borderStyle": "dashed",
-                "borderRadius": "5px",
-                "textAlign": "center",
-                "margin": "10px",
+                "width": "100%", "height": "60px", "lineHeight": "60px",
+                "borderWidth": "1px", "borderStyle": "dashed", "borderRadius": "5px",
+                "textAlign": "center", "margin": "10px",
             },
             multiple=False
         ),
         html.Button("Start Training", id="train-button", n_clicks=0, style={
             "margin": "10px", "padding": "10px", "backgroundColor": "#6c7a89", "color": "white"
         }),
-        html.Div(id="training-status", style={"textAlign": "center", "color": "#7f8c8d"})
+        dcc.Loading(
+            id="loading-train",
+            type="circle",
+            children=html.Div(id="training-status"),
+            color="#6c7a89"
+        )
     ]),
 
+    # Кнопка анализа
     html.Div([
         html.Button(
             "Analyze Test Data",
@@ -65,8 +60,24 @@ app.layout = html.Div([
         )
     ], style={"textAlign": "center"}),
 
-    html.Div(id="dashboard-content"),
+    # Графики
+    dcc.Loading(
+        id="loading-dashboard",
+        type="default",
+        children=html.Div(id="dashboard-content"),
+        color="#6c7a89"
+    ),
 
+    # Облака слов
+    html.H2("Word Clouds", style={"textAlign": "center", "marginTop": "30px"}),
+    dcc.Loading(
+        id="loading-clouds",
+        type="default",
+        children=html.Div(id="wordclouds", style={"display": "flex", "justifyContent": "center", "gap": "40px"}),
+        color="#6c7a89"
+    ),
+
+    # Вкладки и комментарии
     dcc.Tabs(id="tabs", value="positive", children=[
         dcc.Tab(label="Positive Comments", value="positive", style={"color": "#6c7a89"}),
         dcc.Tab(label="Neutral Comments", value="neutral", style={"color": "#5a6b7d"}),
@@ -75,6 +86,7 @@ app.layout = html.Div([
     html.Div(id="comments-content")
 ])
 
+# Callback для обучения модели
 @app.callback(
     Output("training-status", "children"),
     Input("train-button", "n_clicks"),
@@ -92,8 +104,10 @@ def train_model(n_clicks, contents, filename):
             return html.Div(f"Error during training: {str(e)}", style={"color": "#d9534f"})
     return html.Div("Upload a file and click 'Start Training' to begin.")
 
+# Callback для анализа и графиков
 @app.callback(
     Output("dashboard-content", "children"),
+    Output("wordclouds", "children"),
     Input("analyze-button", "n_clicks")
 )
 def update_dashboard(n_clicks):
@@ -104,49 +118,45 @@ def update_dashboard(n_clicks):
             global df
             df = pd.DataFrame(processed_data)
 
-            # Обработка времени
             df["date"] = pd.to_datetime(df["date"], unit="s")
             df["day"] = df["date"].dt.date
-
-            # График распределения тональностей
-            sentiment_counts = df["sentiment_label"].value_counts().reset_index()
-            sentiment_counts.columns = ["Sentiment", "Count"]
-            fig1 = px.bar(sentiment_counts, x="Sentiment", y="Count", title="Sentiment Distribution")
-
-            # График лайков по дням
             df["likes"] = df["likes"].apply(lambda x: x.get("count", 0) if isinstance(x, dict) else 0)
-            likes_per_day = df.groupby("day")["likes"].sum().reset_index()
-            fig2 = px.line(likes_per_day, x="day", y="likes", markers=True, title="Likes Over Time")
-
-            # График комментариев по дням
             df["comments"] = df["comments"].apply(lambda x: x.get("count", 0) if isinstance(x, dict) else 0)
-            comments_per_day = df.groupby("day")["comments"].sum().reset_index()
-            fig3 = px.line(comments_per_day, x="day", y="comments", markers=True, title="Comments Over Time")
 
-            # График тональностей по дням
-            sentiment_by_day = df.groupby(["day", "sentiment_label"]).size().reset_index(name="count")
-            fig4 = px.line(
-                sentiment_by_day,
-                x="day",
-                y="count",
-                color="sentiment_label",
-                markers=True,
-                title="Sentiment Over Time"
-            )
+            # Графики
+            fig1 = px.bar(df["sentiment_label"].value_counts().reset_index(), x="index", y="sentiment_label", 
+                          labels={"index": "Sentiment", "sentiment_label": "Count"}, title="Sentiment Distribution")
+            fig2 = px.line(df.groupby("day")["likes"].sum().reset_index(), x="day", y="likes", title="Likes Over Time")
+            fig3 = px.line(df.groupby("day")["comments"].sum().reset_index(), x="day", y="comments", title="Comments Over Time")
+            fig4 = px.line(df.groupby(["day", "sentiment_label"]).size().reset_index(name="count"),
+                           x="day", y="count", color="sentiment_label", title="Sentiment Over Time")
+
+            # Облака слов
+            cloud_positive = generate_wordcloud(df, "positive")
+            cloud_neutral = generate_wordcloud(df, "neutral")
+            cloud_negative = generate_wordcloud(df, "negative")
+
+            wordclouds = html.Div([
+                html.Div([html.H4("Positive"), html.Img(src=f"/static/{cloud_positive}", style={"width": "250px"})]),
+                html.Div([html.H4("Neutral"), html.Img(src=f"/static/{cloud_neutral}", style={"width": "250px"})]),
+                html.Div([html.H4("Negative"), html.Img(src=f"/static/{cloud_negative}", style={"width": "250px"})])
+            ], style={"display": "flex", "justifyContent": "center", "gap": "40px"})
 
             return html.Div([
                 dcc.Graph(figure=fig1),
                 dcc.Graph(figure=fig2),
                 dcc.Graph(figure=fig3),
                 dcc.Graph(figure=fig4)
-            ])
+            ]), wordclouds
+
         except Exception as e:
             return html.Div([
                 html.H3("An error occurred during analysis", style={"color": "#d9534f"}),
                 html.P(str(e))
-            ])
-    return html.Div("Click the button to analyze the test data.")
+            ]), html.Div()
+    return html.Div("Click the button to analyze the test data."), html.Div()
 
+# Callback для отображения комментариев по вкладке
 @app.callback(
     Output("comments-content", "children"),
     Input("tabs", "value")
