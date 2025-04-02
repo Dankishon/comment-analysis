@@ -1,0 +1,31 @@
+@startuml
+title Activity Diagram: Анализ комментариев
+
+start
+
+:Пользователь загружает training.json;
+:Отправка файла на сервер (Flask API /api/train);
+:Flask декодирует файл и обучает модель;
+:Сохраняются model.pkl и vectorizer.pkl;
+note right
+  Обучение завершено
+end note
+
+:Пользователь загружает test.json;
+:Файл сохраняется во фронте (dcc.Store);
+
+:Пользователь нажимает "Analyze";
+
+:Dash вызывает analyze_sentiments();
+:ML модель возвращает метки;
+:Преобразование данных в DataFrame;
+:Построение графиков и облаков слов;
+
+fork
+  :Отображение графиков;
+fork again
+  :Отображение вкладок с комментариями;
+end fork
+
+stop
+@enduml

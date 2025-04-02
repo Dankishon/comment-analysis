@@ -1,0 +1,26 @@
+@startuml
+actor User
+participant "Dash Interface" as Dash
+participant "Flask API Server" as Flask
+participant "ML Core\n(process_data.py)" as ML
+
+== Тренировка модели ==
+
+User -> Dash : Загружает training_data.json
+Dash -> Flask : POST /api/train\n{file_name, file_content (base64)}
+Flask -> ML : train_model(file_path)
+ML -> ML : Обучение модели и векторизатора
+ML -> Flask : model.pkl, vectorizer.pkl
+Flask -> Dash : {"message": "Model trained"}
+
+== Анализ комментариев ==
+
+User -> Dash : Загружает test_data.json
+Dash -> Dash : Сохраняет в Store
+User -> Dash : Нажимает "Analyze"
+Dash -> Dash : analyze_sentiments(data["items"])
+Dash -> ML : Вызов функций анализа
+ML -> Dash : Обработанные комментарии с тональностью
+Dash -> Dash : Визуализация графиков и облаков слов
+
+@enduml

@@ -1,0 +1,29 @@
+@startuml
+title A1: Загрузка данных
+
+skinparam rectangle {
+  BackgroundColor #F3F3F3
+  BorderColor Black
+  FontSize 14
+}
+
+' Функция
+rectangle "A1\nЗагрузка данных" as A1
+
+' Вход
+rectangle "JSON-файл" as Input
+Input --> A1 : Input
+
+' Управление
+rectangle "Требования к формату\n(структура, поля)" as Control
+Control --> A1 : Control
+
+' Выход
+rectangle "Подготовленные данные\n(комментарии или обучающая выборка)" as Output
+A1 --> Output : Output
+
+' Механизм
+rectangle "Dash Upload\ndcc.Store\nfrontend" as Mechanism
+Mechanism --> A1 : Mechanism
+
+@enduml

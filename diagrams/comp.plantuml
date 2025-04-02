@@ -1,0 +1,41 @@
+@startuml
+skinparam componentStyle rectangle
+
+package "Frontend" {
+  [dashboard.py] --> [Dash UI]
+  component "Dash UI" {
+    [dcc.Upload]
+    [dcc.Graph]
+    [dcc.Tabs]
+    [dcc.Store]
+  }
+  [Dash UI] --> [Static Files]
+}
+
+package "Backend" {
+  [dashboard.py] --> [Flask API (main.py)]
+  [Flask API (main.py)] --> [process_data.py]
+  [Flask API (main.py)] --> [model.pkl]
+  [Flask API (main.py)] --> [vectorizer.pkl]
+}
+
+package "Core Logic" {
+  component "process_data.py" {
+    [load_json()]
+    [analyze_sentiments()]
+    [train_model()]
+    [generate_wordcloud()]
+  }
+}
+
+package "Data" {
+  [training_data.json]
+  [test_data.json]
+  [temp_training_data.json]
+}
+
+[Flask API (main.py)] --> [training_data.json]
+[Flask API (main.py)] --> [test_data.json]
+[process_data.py] --> [Data Files]
+
+@enduml

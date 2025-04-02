@@ -1,0 +1,27 @@
+@startuml
+skinparam rectangle {
+  RoundCorner 5
+}
+
+title A-0: Анализ комментариев
+
+' Основной процесс
+rectangle "Анализ комментариев" as A0 {
+}
+
+' Вход
+rectangle "JSON с комментариями" as Input
+Input -right-> A0
+
+' Управление
+rectangle "Пользовательские требования" as Control
+Control -down-> A0
+
+' Выход
+rectangle "Графики,\nОблака слов,\nКлассификация" as Output
+A0 -right-> Output
+
+' Механизмы
+rectangle "ML-модель,\nPython-модули" as Mechanism
+Mechanism -up-> A0
+@enduml

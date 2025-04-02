@@ -1,0 +1,79 @@
+openapi: 3.0.0
+info:
+  title: Comment Analysis API
+  version: 1.0.0
+  description: API для обучения модели, классификации и анализа комментариев
+servers:
+  - url: http://localhost:5001
+    description: Локальный сервер
+paths:
+  /api/data:
+    get:
+      summary: Получить обработанные тестовые данные
+      responses:
+        '200':
+          description: Успешно возвращён массив комментариев
+        '500':
+          description: Ошибка при обработке
+  /api/train:
+    post:
+      summary: Обучить модель
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                file_name:
+                  type: string
+                file_content:
+                  type: string
+                  description: base64-encoded content
+              required:
+                - file_name
+                - file_content
+      responses:
+        '200':
+          description: Модель успешно обучена
+        '400':
+          description: Ошибка в запросе
+        '500':
+          description: Внутренняя ошибка сервера
+  /api/classify:
+    post:
+      summary: Классифицировать тексты с помощью модели
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                texts:
+                  type: array
+                  items:
+                    type: string
+              required:
+                - texts
+      responses:
+        '200':
+          description: Массив предсказанных меток
+        '400':
+          description: Некорректный запрос
+        '500':
+          description: Ошибка классификации
+  /static/{path}:
+    get:
+      summary: Получить статический файл
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Файл найден и возвращён
+        '404':
+          description: Файл не найден
