@@ -5,44 +5,61 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from torch.nn.functional import softmax
-import torch
-from sklearn.feature_extraction.text import CountVectorizer
+from transformers import pipeline
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from catboost import CatBoostClassifier
 from bertopic import BERTopic
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.feature_extraction import text
 import pandas as pd
+from sentence_transformers import SentenceTransformer
 
-# === ИНИЦИАЛИЗАЦИЯ Huggingface МОДЕЛИ ===
-MODEL_NAME = "cointegrated/rubert-tiny2"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+# === Ключевые слова для кризисных сообщений ===
+CRISIS_KEYWORDS = ["авария", "инцидент", "катастрофа", "пожар", "скандал", "кризис", "угроза", "опасность"]
 
-# === АНАЛИЗ ТОНАЛЬНОСТИ ===
-def analyze_sentiment(text):
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-    with torch.no_grad():
-        outputs = model(**inputs)
-        probs = softmax(outputs.logits, dim=-1)
-    pred_label = torch.argmax(probs).item()
-    confidence = probs[0][pred_label].item()
-    label_map = {0: "negative", 1: "neutral", 2: "positive"}
-    return label_map.get(pred_label, "neutral"), confidence
+def is_crisis_message(text):
+    return any(keyword.lower() in text.lower() for keyword in CRISIS_KEYWORDS)
 
-def analyze_sentiments(data):
+# === ИНИЦИАЛИЗАЦИЯ PREDICTOR ===
+sentiment_analyzer = pipeline("sentiment-analysis", model="blanchefort/rubert-base-cased-sentiment")
+
+# === АНАЛИЗ ТОНАЛЬНОСТИ И КРИЗИСНЫХ ТЕМ ===
+def analyze_sentiments_combined(data):
     processed_data = []
     for entry in data:
         text = entry.get("text", "")
-        if text:
-            sentiment_label, sentiment_score = analyze_sentiment(text)
-            entry["sentiment_label"] = sentiment_label
-            entry["sentiment_score"] = sentiment_score
-        processed_data.append(entry)
+        date = entry.get("date", 0)
+        likes = entry.get("likes", {})
+        comments = entry.get("comments", {})
+        sentiment_label, sentiment_score = analyze_sentiment(text)
+        # Унификация ключа - если в исходных данных уже есть "is_crisis", оставляем его, иначе определяем автоматически
+        crisis_flag = entry.get("is_crisis", is_crisis_message(text))
+        processed_data.append({
+            "text": text,
+            "date": date,
+            "likes": likes,
+            "comments": comments,
+            "sentiment_label": sentiment_label,
+            "sentiment_score": sentiment_score,
+            "is_crisis": crisis_flag  # Единый ключ
+        })
     return processed_data
+
+def analyze_sentiment(text):
+    try:
+        result = sentiment_analyzer(text[:512])[0]
+        label = result['label'].lower()
+        score = result['score']
+        return label, score
+    except Exception:
+        return "neutral", 0.5
+
+# === КРИЗИСНЫЙ АНАЛИЗ ===
+def get_crisis_data(df):
+    if "is_crisis" not in df.columns:
+        return pd.DataFrame()
+    return df[df["is_crisis"] == True]
 
 # === ОБУЧЕНИЕ И КЛАССИФИКАЦИЯ CatBoost ===
 def load_training_data(file_path):
@@ -67,7 +84,7 @@ def train_model(training_file, model_path=None, vectorizer_path=None):
             pickle.dump(vectorizer, f)
     return model_cb, vectorizer
 
-# === ЗАГРУЗКА/СОХРАНЕНИЕ ДАННЫХ ===
+# === ЗАГРУЗКА И СОХРАНЕНИЕ ДАННЫХ ===
 def load_json(file_path):
     with open(file_path, encoding="utf-8") as f:
         return json.load(f)
@@ -76,7 +93,7 @@ def save_json(data, file_path):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-# === КЛАССИФИКАЦИЯ ТЕКСТОВ ===
+# === КЛАССИФИКАЦИЯ ТЕКСТОВ CatBoost ===
 model_cb, vectorizer_cb = None, None
 def classify_texts(texts, loaded_model=None, loaded_vectorizer=None):
     global model_cb, vectorizer_cb
@@ -107,21 +124,42 @@ def generate_wordcloud(df, sentiment_label, output_dir="../frontend/static"):
     plt.close()
     return filename
 
-# === BERTOPIC - ДИНАМИЧЕСКИЙ АНАЛИЗ ТЕМ ===
+def generate_crisis_wordcloud(df, output_dir="../frontend/static"):
+    if "is_crisis" not in df.columns:
+        return None
+    texts = df[df["is_crisis"] == True]["text"].dropna().tolist()
+    if not texts:
+        return None
+    combined_text = " ".join(texts)
+    wordcloud = WordCloud(width=800, height=400, background_color="white", collocations=False).generate(combined_text)
+    os.makedirs(output_dir, exist_ok=True)
+    filename = "wordcloud_crisis.png"
+    filepath = os.path.join(output_dir, filename)
+    plt.figure(figsize=(10, 5))
+    plt.imshow(wordcloud, interpolation="bilinear")
+    plt.axis("off")
+    plt.tight_layout(pad=0)
+    plt.savefig(filepath)
+    plt.close()
+    return filename
+
+# === BERTOPIC - АНАЛИЗ ТЕМ ===
 def get_topics_distribution(df):
     texts = df["text"].dropna().tolist()
     if not texts:
         return pd.DataFrame(columns=["Topic", "Count"])
-    
-    # Исправленный список стоп-слов
+
+    embedder = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+    embeddings = embedder.encode(texts, show_progress_bar=True)
+
     russian_stop_words = text.ENGLISH_STOP_WORDS.union([
-        'это', 'в', 'на', 'и', 'но', 'да', 'что', 'как', 'так', 'же', 'бы', 'за', 'по', 'из', 'у', 'о', 'к', 'с', 'со', 
-        'до', 'для', 'при', 'без', 'не', 'его', 'ее', 'их', 'мы', 'вы', 'они', 'я', 'он', 'она', 'ты', 'оно', 'ли', 
+        'это', 'в', 'на', 'и', 'но', 'да', 'что', 'как', 'так', 'же', 'бы', 'за', 'по', 'из', 'у', 'о', 'к', 'с', 'со',
+        'до', 'для', 'при', 'без', 'не', 'его', 'ее', 'их', 'мы', 'вы', 'они', 'я', 'он', 'она', 'ты', 'оно', 'ли',
         'или', 'был', 'были', 'быть', 'есть', 'нет', 'может', 'очень', 'сам', 'там', 'тут', 'тогда', 'сейчас'
     ])
 
     vectorizer_model = TfidfVectorizer(stop_words=russian_stop_words)
-    topic_model = BERTopic(vectorizer_model=vectorizer_model, language="multilingual")
+    topic_model = BERTopic(embedding_model=embedder, vectorizer_model=vectorizer_model, language="multilingual")
     topics, _ = topic_model.fit_transform(texts)
     topic_counts = pd.Series(topics).value_counts().reset_index()
     topic_counts.columns = ["Topic", "Count"]
